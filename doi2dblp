@@ -1,0 +1,129 @@
+#! /bin/bash
+
+usage()
+{
+    cat <<EOF
+Usage:
+
+    doi2dblp [options...] doi
+
+Parameters:
+
+doi
+    The digital object identifier for which a bibfile should be retrieved.
+    This can be either the raw identifier or a URL. The following are
+    valid examples:
+    - 10.1145/2783446.2783605
+    - https://doi.org/10.1145/2783446.2783605
+    - dx.doi.org/10.1145/2783446.2783605
+
+Accepted options:
+
+--help
+    Display this message and exit.
+
+--outfile FILE
+-o FILE
+    Append to the specified FILE, rather than printing the retrieved
+    bibfile to stdout.
+
+--standard
+    Retrieve the standard bibfile. This is the default.
+    Overrides any previous \`--condensed\` or \`--crossref\` options.
+
+--condensed
+    Retrieve the condensed bibfile.
+    Overrides any previous \`--standard\` or \`--crossref\` options.
+
+--crossref
+    Retrieve the bibfile with crossref.
+    Overrides any previous \`--standard\` or \`--condensed\` options.
+EOF
+}
+
+error()
+{
+    echo $@ >&2
+}
+
+upcase()
+{
+    echo $1 | tr '[a-z]' '[A-Z]'
+}
+
+extract_doi() {
+    local raw_doi=$1
+    raw_doi=${raw_doi#*://}
+    raw_doi=${raw_doi#www.}
+    raw_doi=${raw_doi#dx.}
+    raw_doi=${raw_doi#doi.org/}
+    upcase $raw_doi
+}
+
+declare doi
+declare mode=1
+declare outfile
+
+while [[ $# -ne 0 ]]
+do
+    param=$1
+    shift
+    case $param in
+        --help)
+            usage
+            exit 0
+            ;;
+        --outfile | -o)
+            outfile="$1"
+            shift
+            ;;
+        --condensed)
+            mode=0
+            ;;
+        --standard)
+            mode=1
+            ;;
+        --crossref)
+            mode=2
+            ;;
+        *)
+            doi=https://doi.org/$(extract_doi $param)
+            ;;
+    esac
+done
+
+if [[ -z $doi ]]
+then
+    error "You must specify a DOI."
+    exit 1
+fi
+
+sparql_query="PREFIX dblp: <https://dblp.org/rdf/schema#> SELECT ?publ WHERE {?publ dblp:doi <$doi> .}"
+sparql_response=$(curl -s \
+                       -X POST https://sparql.dblp.org/sparql \
+                       -H 'Accept: text/csv' \
+                       --data-urlencode "query=$sparql_query" \
+                      | tail -n1)
+
+if [[ $sparql_response == publ ]]
+then
+    error "DOI $doi not found on sparql."
+    exit 1
+fi
+
+url="$sparql_response.bib?param=$mode"
+bib_response=$(curl -s $url)
+curl_success=$?
+
+if [[ $curl_success -ne 0 ]]
+then
+    error "Failed to retrieve url $url."
+    exit 1
+fi
+
+if [[ -z $outfile ]]
+then
+    cat <<< "$bib_response"
+else
+    cat <<< "$bib_response" >> "$outfile"
+fi
