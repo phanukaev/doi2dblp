@@ -44,7 +44,6 @@ Accepted options:
 --long-labels
     Shorten the label of the paper (this is the default), or keep the long labels
     provided by DBLP.
-
 EOF
 }
 

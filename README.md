@@ -40,3 +40,7 @@ doi2dblp [options...] doi
 -   `--crossref`:
     Retrieve the bibfile with crossref.
     Overrides any previous `--standard` or `--condensed` options.
+
+-   `--short-labels, --long-labels`:
+    Shorten the label of the paper (this is the default), or keep the long labels
+    provided by DBLP.
