@@ -20,6 +20,7 @@ doi
 Accepted options:
 
 --help
+-h
     Display this message and exit.
 
 --outfile FILE
@@ -38,6 +39,12 @@ Accepted options:
 --crossref
     Retrieve the bibfile with crossref.
     Overrides any previous \`--standard\` or \`--condensed\` options.
+
+--short-labels
+--long-labels
+    Shorten the label of the paper (this is the default), or keep the long labels
+    provided by DBLP.
+
 EOF
 }
 
@@ -63,13 +70,14 @@ extract_doi() {
 declare doi
 declare mode=1
 declare outfile
+declare short_labels=1
 
 while [[ $# -ne 0 ]]
 do
     param=$1
     shift
     case $param in
-        --help)
+        --help | -h)
             usage
             exit 0
             ;;
@@ -85,6 +93,12 @@ do
             ;;
         --crossref)
             mode=2
+            ;;
+        --long-labels)
+            short_labels=0
+            ;;
+        --short-labels)
+            short_labels=1
             ;;
         *)
             doi=https://doi.org/$(extract_doi $param)
@@ -119,6 +133,11 @@ if [[ $curl_success -ne 0 ]]
 then
     error "Failed to retrieve url $url."
     exit 1
+fi
+
+if [[ $((short_labels == 1)) ]]
+then
+    bib_response=$(cat <<< "$bib_response" | sed '1s-{.*/-{-')
 fi
 
 if [[ -z $outfile ]]
